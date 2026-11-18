@@ -170,7 +170,28 @@ Open `http://localhost:8008/viewer.html?model=<car>_hero.glb`.
   skin/palette system (`"paint_design": "etkc_skin_signaturestripes"` in
   the `.pc`), a separate recoloring mechanism not worth chasing for a
   product-hero shot. A flat `Base Color` + clearcoat reads as glossy paint
-  just fine.
+  just fine -- but gloss only reads as gloss if there's something
+  high-contrast nearby to reflect; a flat/uniform environment (lighting or
+  `scene.environment`) makes even a near-zero-roughness clearcoat look
+  matte. Worth a bespoke multi-panel env over a generic procedural one.
+- **Headlight/signal/tail/brake/reverse/fog-light materials have no
+  texture definition anywhere** -- not in the vehicle's own
+  `main.materials.json`/`skin.materials.json`, not in any shared
+  `common/etk/*.materials.json`. BeamNG drives their actual on/off
+  emissive state at runtime from each part's jbeam light props, not a
+  static material. Lumping them all into one flat cream-white fallback
+  (the original heuristic) makes every light element -- lens, chrome
+  reflector housing, amber turn signal, white DRL -- the same flat color,
+  which is exactly what reads as "looks like a sticker." Fixed by giving
+  each element name its own heuristic color (amber for `signal`, red for
+  `chmsl`/`brakelight`/`taillight`, white for `reverselight`, etc.) in
+  `build_material()`'s fallback branch -- check the MOST SPECIFIC
+  substrings first, since `"headlight"`/`"runninglight"`/`"foglight"` all
+  contain `"light"`. Also don't make the chrome reflector housing too
+  metallic (we tried `metalness: 0.85`) without reliable reflection
+  content nearby -- a flat, non-faceted reflector mesh at high metalness
+  with nothing bright to catch just renders near-black from most angles,
+  since metals have no diffuse component.
 - **Glass looks wrong (streaky/dirty) if you use the real `colorMap` as the
   literal Base Color.** BeamNG's glass diffuse texture is meant to blend
   with a live in-game environment reflection (`dynamicCubemap`), not stand
@@ -182,10 +203,14 @@ Open `http://localhost:8008/viewer.html?model=<car>_hero.glb`.
   binary format. An unconstrained export embedding every texture at native
   resolution came to 80MB, of which ~63MB was two interior texture sets
   (4096px normal/color/roughness maps) that are barely visible from outside
-  through tinted glass. Capping every texture to 1024px on load (see
-  `MAX_TEX_SIZE` in `build_hero_glb.py`) cut it to 15.5MB with no visible
-  quality loss. Try this before reaching for Draco/meshopt mesh compression
-  -- geometry was never the problem.
+  through tinted glass. Capping every texture on load (`MAX_TEX_SIZE` in
+  `build_hero_glb.py`) to 1024px cut it to 15.5MB with no visible quality
+  loss from a distance, but looked soft up close on the tires/grille/badges
+  in the live three.js viewer (zoomed in, orbiting) -- bumped the cap to
+  2048px (36.5MB) to fix that. Try this knob before reaching for
+  Draco/meshopt mesh compression -- geometry was never the problem, and
+  the right cap is a judgment call based on how close the viewer lets
+  people zoom in, not a fixed number.
 - **DDS loads natively in Blender 4.4** (confirmed by directly checking
   decoded pixel values) -- no format conversion step needed before using
   BeamNG's own texture files as Blender image textures.

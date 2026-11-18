@@ -68,9 +68,11 @@ GLASS_MATS = {"etkc_glass", "etkc_glass_int", "etkc_glass_lightweight", "etkc_gl
               "etkc_headlightglass", "generic_glass_int", "glass_invisible", "etkc_windshield_dmg",
               "etkc_glass_dmg", "etkc_windshield_lightweight_dmg"}
 
-MAX_TEX_SIZE = 1024  # web hero viewer doesn't need more; interior maps were
-                      # 4096px and barely visible through tinted glass --
-                      # that alone was ~63MB of an 80MB GLB.
+MAX_TEX_SIZE = 2048  # bumped from 1024 after the first pass looked soft up
+                      # close (tires, grille, badges). Interior maps were
+                      # 4096px and are still capped the same as everything
+                      # else here -- they're barely visible through tinted
+                      # glass, so no separate higher cap for them.
 # =======================================================================
 # END VEHICLE CONFIG
 # =======================================================================
@@ -320,9 +322,34 @@ def build_material(name: str) -> bpy.types.Material:
             tnode.location = (out_x, y)
             tree.links.new(tnode.outputs["Color"], bsdf.inputs["Metallic"])
     else:
-        if "light" in lname or "signal" in lname or "chmsl" in lname:
-            bsdf.inputs["Base Color"].default_value = (0.9, 0.9, 0.85, 1.0)
+        # BeamNG's light-element materials (headlight/signal/tail/brake/
+        # reverse/fog/running) have no texture definition anywhere -- the
+        # engine drives their actual on/off emissive state at runtime from
+        # jbeam light props, not a static materials.json. Lumping them all
+        # into one flat cream-white fallback is what made headlights read
+        # as a flat sticker: no chrome reflector look, no amber signal
+        # tint, everything the same color. Specific substrings MUST be
+        # checked before the generic ones they're a superset of
+        # ("runninglight"/"foglight"/"headlight" all contain "light").
+        if "signal" in lname:
+            bsdf.inputs["Base Color"].default_value = (0.95, 0.45, 0.05, 1.0)  # amber turn signal lens
+            bsdf.inputs["Roughness"].default_value = 0.25
+        elif "chmsl" in lname or "brakelight" in lname or "taillight" in lname:
+            bsdf.inputs["Base Color"].default_value = (0.85, 0.05, 0.05, 1.0)  # red brake/tail lens
+            bsdf.inputs["Roughness"].default_value = 0.2
+        elif "reverselight" in lname:
+            bsdf.inputs["Base Color"].default_value = (0.9, 0.92, 0.95, 1.0)  # clear/white reverse lens
             bsdf.inputs["Roughness"].default_value = 0.15
+        elif "runninglight" in lname or "foglight" in lname:
+            bsdf.inputs["Base Color"].default_value = (0.92, 0.93, 0.95, 1.0)  # white DRL/fog lens
+            bsdf.inputs["Roughness"].default_value = 0.12
+        elif "headlight" in lname:
+            # the reflector housing behind the clear lens cover, not the
+            # lens itself (that's etkc_headlightglass, a real material) --
+            # should look like a polished chrome bowl, not flat matte white
+            bsdf.inputs["Base Color"].default_value = (0.75, 0.76, 0.78, 1.0)
+            bsdf.inputs["Metallic"].default_value = 0.85
+            bsdf.inputs["Roughness"].default_value = 0.18
         elif "chrome" in lname or "mirror" in lname:
             bsdf.inputs["Base Color"].default_value = (0.8, 0.8, 0.8, 1.0)
             bsdf.inputs["Metallic"].default_value = 1.0

@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, url_for
 
 LAUNCHER_DIR = Path(__file__).resolve().parent
 REPO_ROOT = LAUNCHER_DIR.parents[1]
@@ -68,6 +68,28 @@ TIMING_PROFILES = {"legacy_60hz", "det50ms"}
 REWARD_CONFIG_KEYS = {"v1", "v2", "v21a", "v21b", "v22", "v22b"}
 OBS_CONFIG_KEYS = {"v1", "v2"}
 SPAWN_MODES = {"bootstrap", "random_checkpoint"}
+
+# Hero 3D viewer ("Garage" tab) -- model + spec data per car. Specs are
+# derived from the trim's own .pc/.jbeam part names (see
+# scripts/vehicle_viewer/README.md), not fabricated. A car with no "model"
+# entry shows a "coming soon" state in the UI instead of the viewer.
+VEHICLE_VIEWER = {
+    "etkc": {
+        "model": "models/etkc_hero.glb",
+        "specs": [
+            {"label": "Engine", "value": "3.0L Turbo I6"},
+            {"label": "Power", "value": "360 HP", "gauge_max": 500},
+            {"label": "Drivetrain", "value": "AWD"},
+            {"label": "Transmission", "value": "8-Speed Auto"},
+            {"label": "Tires F/R", "value": "245/35R19 · 265/35R19"},
+            {"label": "Brakes", "value": "Carbon-Ceramic"},
+        ],
+    },
+    "sbr": {
+        "model": None,
+        "specs": [],
+    },
+}
 
 PYTHON_EXE = REPO_ROOT / "venv" / "Scripts" / "python.exe"
 if not PYTHON_EXE.exists():
@@ -545,6 +567,36 @@ def api_runs():
     return jsonify({
         "runs": runs,
         "details": {run_name: _run_details(run_name) for run_name in runs},
+    })
+
+
+@app.route("/api/vehicle/<car>/viewer")
+def api_vehicle_viewer(car):
+    car = car.strip().lower()
+    entry = VEHICLE_VIEWER.get(car)
+    if entry is None:
+        return jsonify({"ok": False, "message": f"Unknown car {car!r}."}), 404
+    model_path = entry["model"]
+    # Check the file actually exists -- the GLB is a build artifact derived
+    # from BeamNG's own assets (see scripts/vehicle_viewer/README.md), not
+    # something every clone of this repo necessarily has on disk.
+    model_file = (Path(app.static_folder) / model_path) if model_path else None
+    available = bool(model_file and model_file.is_file())
+    model_url = None
+    if available:
+        # Cache-bust on the file's own mtime -- large static assets like
+        # this 30+MB GLB can get served from the browser's disk cache
+        # without revalidation even across a server restart, since the
+        # URL itself never changes. Tying the query string to mtime means
+        # a regenerated model always gets a fresh URL.
+        model_url = f"{url_for('static', filename=model_path)}?v={int(model_file.stat().st_mtime)}"
+    return jsonify({
+        "ok": True,
+        "car": car,
+        "car_label": CAR_LABELS.get(car, car),
+        "available": available,
+        "model_url": model_url,
+        "specs": entry["specs"],
     })
 
 

@@ -27,6 +27,13 @@ assets/*-palette.png
 # Regenerate via scripts/vehicle_viewer/README.md.
 scratch_vehicle_extract/
 
+# Hero-viewer GLB models -- same reason as above: derived from BeamNG's
+# own licensed assets, not ours to commit. The launcher's Garage tab
+# checks whether each one exists on disk and shows "coming soon" if not
+# (scripts/launcher/app.py's /api/vehicle/<car>/viewer), so a clone
+# without these just degrades gracefully instead of breaking.
+scripts/launcher/static/models/*.glb
+
 # Local/editor/machine state.
 .claude/
 .vscode/
