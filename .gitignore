@@ -22,6 +22,11 @@ assets/*.mov
 assets/*.mkv
 assets/*-palette.png
 
+# Scratch workdir for scripts/vehicle_viewer/ -- extracted BeamNG game
+# assets (not ours to redistribute) plus generated GLB/render output.
+# Regenerate via scripts/vehicle_viewer/README.md.
+scratch_vehicle_extract/
+
 # Local/editor/machine state.
 .claude/
 .vscode/
